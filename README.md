@@ -38,9 +38,9 @@ actor_model = AutoModelForCausalLM.from_pretrained(...)
 
 它定义当前策略：
 
-$$
+```math
 \pi_\theta(a_t \mid s_t)
-$$
+```
 
 其中 $s_t$ 表示当前上下文 token 序列，$a_t$ 表示下一步生成的 token。
 
@@ -48,9 +48,9 @@ $$
 
 Reference Model 是 Actor 的初始副本，用于约束策略不要偏离初始语言模型太远：
 
-$$
+```math
 \pi_{ref}(a_t \mid s_t)
-$$
+```
 
 训练中不会用它反向传播，只用它计算 KL 惩罚。
 
@@ -58,9 +58,9 @@ $$
 
 Reward Model 对 Actor 生成的完整文本打分：
 
-$$
+```math
 r_{rm} = R_\psi(x, y)
-$$
+```
 
 其中 $x$ 是 prompt，$y$ 是 response。当前实现中，Reward Model 输出的是结果奖励，会被加到 response 最后一个有效 token 上。
 
@@ -68,9 +68,9 @@ $$
 
 Critic 用于估计每个生成 token 对应状态的价值：
 
-$$
+```math
 V_\phi(s_t)
-$$
+```
 
 代码中 `Critic` 复用 Actor 的 base model，并额外添加一个线性回归头：
 
@@ -90,21 +90,21 @@ PPO 的目标是在提升奖励的同时限制策略更新幅度，避免一次�
 
 设旧策略为 $\pi_{\theta_{\text{old}}}$，当前策略为 $\pi_\theta$。对于某个 response token $a_t$，策略概率比为：
 
-$$
+```math
 r_t(\theta)
 = \frac{\pi_\theta(a_t \mid s_t)}
 {\pi_{\theta_{\text{old}}}(a_t \mid s_t)}
-$$
+```
 
 由于代码中使用 log probability 计算，因此实现形式为：
 
-$$
+```math
 r_t(\theta)
 = \exp \left(
 \log \pi_\theta(a_t \mid s_t)
 - \log \pi_{\theta_{\text{old}}}(a_t \mid s_t)
 \right)
-$$
+```
 
 对应代码：
 
@@ -114,7 +114,7 @@ ratio = (log_probs - old_log_probs).exp()
 
 PPO clipped objective 为：
 
-$$
+```math
 L^{CLIP}(\theta)
 =
 \mathbb{E}_t
@@ -125,11 +125,11 @@ r_t(\theta) A_t,
 \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) A_t
 \right)
 \right]
-$$
+```
 
 训练时最小化负目标：
 
-$$
+```math
 L_{\pi}(\theta)
 =
 -\mathbb{E}_t
@@ -140,7 +140,7 @@ r_t(\theta) A_t,
 \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon) A_t
 \right)
 \right]
-$$
+```
 
 代码实现位于 `compute_policy_loss()`：
 
@@ -158,13 +158,13 @@ loss = -torch.min(surr1, surr2)
 
 当前代码使用 log probability 差值作为近似 KL：
 
-$$
+```math
 KL_t
 \approx
 \log \pi_\theta(a_t \mid s_t)
 -
 \log \pi_{ref}(a_t \mid s_t)
-$$
+```
 
 对应实现：
 
@@ -174,9 +174,9 @@ log_ratio = log_probs.float() - ref_log_probs.float()
 
 KL 惩罚被转换为 token-level reward：
 
-$$
+```math
 r^{kl}_t = -\beta \cdot KL_t
-$$
+```
 
 其中 $\beta$ 对应 `kl_ctl`。代码中默认：
 
@@ -186,13 +186,13 @@ kl_ctl = 0.1
 
 最终 token reward 由 KL 惩罚和 Reward Model 的结果奖励共同组成：
 
-$$
+```math
 r_t =
 \begin{cases}
 -\beta KL_t + \text{clip}(r_{rm}, -c, c), & t = T \\
 -\beta KL_t, & t < T
 \end{cases}
-$$
+```
 
 其中 $T$ 是 response 最后一个有效 token 的位置，$c$ 对应 `clip_reward_value`。
 
@@ -211,19 +211,19 @@ PPO 使用优势函数 $A_t$ 衡量某个动作相对于当前价值函数预期
 
 单步 TD error 为：
 
-$$
+```math
 \delta_t
 =
 r_t + \gamma V(s_{t+1}) - V(s_t)
-$$
+```
 
 GAE（Generalized Advantage Estimation）通过反向递推平衡 bias 和 variance：
 
-$$
+```math
 A_t
 =
 \delta_t + \gamma \lambda A_{t+1}
-$$
+```
 
 其中：
 
@@ -234,9 +234,9 @@ $$
 
 回报由优势和价值相加得到：
 
-$$
+```math
 R_t = A_t + V(s_t)
-$$
+```
 
 代码实现位于 `get_advantages_and_returns()`：
 
@@ -260,7 +260,7 @@ lambd = 0.2
 
 Critic 的训练目标是让价值估计 $V_\phi(s_t)$ 拟合 GAE 得到的 return：
 
-$$
+```math
 L_V(\phi)
 =
 \mathbb{E}_t
@@ -269,7 +269,7 @@ L_V(\phi)
 V_\phi(s_t) - R_t
 \right)^2
 \right]
-$$
+```
 
 代码实现位于 `compute_value_loss()`：
 
@@ -279,7 +279,7 @@ loss = (values - returns) ** 2
 
 函数也支持 value clipping。若启用 `clip_eps`，会先计算：
 
-$$
+```math
 V^{clip}_t
 =
 V^{old}_t
@@ -290,11 +290,11 @@ V_t - V^{old}_t,
 -\epsilon,
 \epsilon
 \right)
-$$
+```
 
 然后取 clipped value loss 和普通 value loss 的较大值：
 
-$$
+```math
 L_V
 =
 \max
@@ -302,7 +302,7 @@ L_V
 (V^{clip}_t - R_t)^2,
 (V_t - R_t)^2
 \right)
-$$
+```
 
 当前 `train_step()` 调用时没有传入 `clip_eps`，因此实际使用的是普通 MSE value loss。
 
@@ -433,9 +433,9 @@ seqs = model.generate(
 
 生成后的序列会被统一处理成固定长度：
 
-$$
+```math
 \text{total length} = \text{max_length} + \text{max_new_tokens}
-$$
+```
 
 prompt 之后的 token 被视为 action：
 
