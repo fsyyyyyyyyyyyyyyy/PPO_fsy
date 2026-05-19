@@ -433,8 +433,8 @@ seqs = model.generate(
 
 生成后的序列会被统一处理成固定长度：
 
-```math
-\text{total length} = \text{max_length} + \text{max_new_tokens}
+```text
+total_length = max_length + max_new_tokens
 ```
 
 prompt 之后的 token 被视为 action：
