@@ -731,9 +731,13 @@ train()
 例如，结合参数：
 
 episodes = 3
+
 max_epochs = 5
+
 rollout_batch_size = 8
+
 micro_rollout_batch_size = 2
+
 n_samples_per_prompt = 2
 
 意思是：
@@ -741,14 +745,19 @@ n_samples_per_prompt = 2
 总共做 3 个 episode。
 
 每个 episode：
+    
     取 8 条 prompt 生成经验。
+    
     但生成时不是一次处理 8 条，而是每次处理 2 条。
+    
     所以需要处理 8 / 2 = 4 次 micro rollout。
 
     每条 prompt 生成 2 个 response。
+    
     所以最终得到 8 × 2 = 16 条 response 经验。
 
     然后用这 16 条经验训练 5 个 epoch。
+    
     训练完后丢弃这批经验，进入下一个 episode，重新生成新经验。
 
 ## 总结
