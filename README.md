@@ -723,6 +723,34 @@ train()
 - 可以将 `gamma`、`lambd`、`kl_ctl`、学习率等改为命令行参数。
 - 可以使用更细粒度的 KL 统计、reward 统计和生成长度统计辅助调试。
 
+## 训练轮数、经验训练、rollout
+
+首先设置总迭代轮数 episodes。每个 episode 中，用当前策略模型 Actor 生成一批经验。由于生成经验成本较高，所以不会生成完只训练一次，而是把这批经验放入 buffer，用同一批经验训练 max_epochs 轮。
+在生成经验时，每个 rollout 总共取 rollout_batch_size 条 prompt；但由于一次性处理这么多 prompt 会占用较大显存，所以实际会按照 micro_rollout_batch_size 拆分成若干个小批次依次生成。每个 prompt 会生成 n_samples_per_prompt 个回答，最后把这些小批次的结果合并成完整的一批 rollout 经验。
+
+例如，结合参数：
+
+episodes = 3
+max_epochs = 5
+rollout_batch_size = 8
+micro_rollout_batch_size = 2
+n_samples_per_prompt = 2
+
+意思是：
+
+总共做 3 个 episode。
+
+每个 episode：
+    取 8 条 prompt 生成经验。
+    但生成时不是一次处理 8 条，而是每次处理 2 条。
+    所以需要处理 8 / 2 = 4 次 micro rollout。
+
+    每条 prompt 生成 2 个 response。
+    所以最终得到 8 × 2 = 16 条 response 经验。
+
+    然后用这 16 条经验训练 5 个 epoch。
+    训练完后丢弃这批经验，进入下一个 episode，重新生成新经验。
+
 ## 总结
 
 本项目展示了一个从零实现的语言模型 PPO 训练闭环：
@@ -736,3 +764,5 @@ train()
 ```
 
 它覆盖了 RLHF/RLAIF 中最关键的组件：Actor、Reference、Reward Model、Critic、KL penalty、GAE 和 PPO clipped loss。通过阅读 `ppo_train.py` 和本 README，可以清楚追踪每个训练张量从哪里来、如何被使用，以及最终如何影响模型参数更新。
+
+
